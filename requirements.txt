@@ -1,6 +1,6 @@
-setuptools==2.2
-numpy==1.11.2
-scipy==0.18.1
-nibabel==2.1.0
-Cython==0.25.2
-dipy==0.11.0
+setuptools==39.0.1
+numpy==1.17.0
+scipy==1.2.1
+nibabel==3.0.1
+Cython==0.29.16
+dipy==1.1.1

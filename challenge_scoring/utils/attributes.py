@@ -51,7 +51,6 @@ def compute_attrib_files(root_dir, attrib_func, attrib_name):
     fnames = glob.glob(os.path.join(root_dir, '*'))
 
     for fname in fnames:
-        print(fname)
         val = attrib_func(fname)
         attribs[os.path.basename(fname)] = {attrib_name: val}
 

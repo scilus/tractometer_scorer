@@ -8,8 +8,9 @@ import logging
 import os
 import random
 
-import dipy.segment.quickbundles as qb
 import numpy as np
+
+from dipy.segment.clustering import QuickBundles
 from scipy.spatial.distance import cdist
 
 from challenge_scoring.io.streamlines import save_invalid_connections
@@ -46,7 +47,8 @@ def find_closest_region(points, rois):
 
 
 def get_closest_roi_pairs_for_bundle(streamlines, rois):
-    start_point = np.reshape(streamlines[0][0], (-1, 3)) # Needs to be 2D for cdist
+    # Needs to be 2D for cdist
+    start_point = np.reshape(streamlines[0][0], (-1, 3))
 
     closest_rois_pairs = []
 
@@ -71,11 +73,10 @@ def get_closest_roi_pairs_for_all_streamlines(streamlines, rois):
     """
     Find the closest pair of ROIs from the endpoints of each provided
     streamline.
-    
-    # TODO params
-    :param streamlines: 
-    :param rois: 
-    :return: 
+
+    :param streamlines: list of streamlines to assign rois to
+    :param rois: list of pairs of roi "names" and data
+    :return: list of pairs of the closest regions for each bundle head and tail
     """
 
     # Needs to be 2D for cdist
@@ -98,26 +99,26 @@ def get_closest_roi_pairs_for_all_streamlines(streamlines, rois):
     return closest_rois_pairs
 
 
-def group_and_assign_ibs(candidate_streamlines, ROIs,
+def group_and_assign_ibs(tractogram, candidate_ids, ROIs,
                          save_ibs, save_full_ic,
-                         out_segmented_dir, base_name, ref_anat_fname):
+                         out_segmented_dir, base_name,
+                         ref_anat_fname, out_tract_type):
     ic_counts = 0
     ib_pairs = {}
 
-    rejected_streamlines = []
+    rejected_indices = []
 
     # Start by clustering all the remaining potentiel IC using QB.
 
     # Fix seed to always generate the same output
     # Shuffle to try to reduce the ordering dependency for QB
     random.seed(0.2)
-    random.shuffle(candidate_streamlines)
+    random.shuffle(candidate_ids)
 
     # TODO threshold on distance as arg for other datasets
-    out_data = qb.QuickBundles(candidate_streamlines,
-                               dist_thr=20.,
-                               pts=12)
-    clusters = out_data.clusters()
+    qb = QuickBundles(threshold=20., metric='MDF_12points')
+    candidate_streamlines = tractogram.streamlines[candidate_ids]
+    clusters = qb.cluster(candidate_streamlines)
 
     logging.debug("Found {} potential IB clusters".format(len(clusters)))
 
@@ -125,17 +126,20 @@ def group_and_assign_ibs(candidate_streamlines, ROIs,
     # Is used in the get_closest_roi_pairs... function.
     rois_info = []
     for roi in ROIs:
-        rois_info.append((get_root_image_name(os.path.basename(roi.get_filename())),
-                          np.array(np.where(roi.get_data())).T))
+        rois_info.append((
+            get_root_image_name(os.path.basename(roi.get_filename())),
+            np.array(np.where(roi.get_data())).T))
 
-    all_ics_closest_pairs = get_closest_roi_pairs_for_all_streamlines(candidate_streamlines, rois_info)
+    all_ics_closest_pairs = get_closest_roi_pairs_for_all_streamlines(
+        candidate_streamlines, rois_info)
 
     for c_idx, c in enumerate(clusters):
-        closest_for_cluster = [all_ics_closest_pairs[i] for i in clusters[c]['indices']]
+        closest_for_cluster = [all_ics_closest_pairs[i]
+                               for i in c.indices]
 
         # Clusters containing only a single streamlines are rejected.
-        if len(clusters[c]['indices']) > 1:
-            ic_counts += len(clusters[c]['indices'])
+        if len(c.indices) > 1:
+            ic_counts += len(c.indices)
             occurences = Counter(closest_for_cluster)
 
             # TODO could be changed in future to allow an equality
@@ -152,14 +156,15 @@ def group_and_assign_ibs(candidate_streamlines, ROIs,
             else:
                 val.append(c_idx)
         else:
-            rejected_streamlines.append(candidate_streamlines[clusters[c]['indices'][0]])
+            rejected_indices.append(c.indices[0])
 
     if save_ibs or save_full_ic:
-        save_invalid_connections(ib_pairs, candidate_streamlines,
+        save_invalid_connections(ib_pairs, candidate_ids, tractogram,
                                  clusters, out_segmented_dir,
                                  base_name,
                                  ref_anat_fname,
+                                 out_tract_type,
                                  save_full_ic=save_full_ic,
                                  save_ibs=save_ibs)
 
-    return rejected_streamlines, ic_counts, len(ib_pairs.keys())
+    return rejected_indices, ic_counts, len(ib_pairs.keys())

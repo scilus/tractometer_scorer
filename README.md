@@ -24,7 +24,6 @@ it is not mandatory. Once setup, run
 
 ```bash
 pip install -r requirements.txt
-pip install -r requirements_additional.txt
 ```
 
 You can then clone or download the scoring system. Once cloned or
@@ -32,7 +31,8 @@ downloaded, go inside the ```ismrm_2015_tractography_challenge_scoring```
 directory, and run
 
 ```bash
-python setup.py build_all
+python setup.py build_ext --inplace
+python setup.py install
 ```
 
 Once those steps are all done, the system is configured.
@@ -47,15 +47,6 @@ truth dataset is needed. It can be downloaded from
 
 Scoring a tractogram
 --------------------
-
-Before trying to run the script, the terminal needs to be configured
-to correctly find the code. Suppose the code is cloned in a directory
-```CODE_DIR/ismrm_2015_tractography_challenge_scoring```, run the following
-command
-
-```bash
-export PYTHONPATH=CODE_DIR/ismrm_2015_tractography_challenge_scoring
-```
 
 Once the ground truth dataset is unarchived (for example, to the
 ```scoring_data``` directory, one needs to create a directory where
